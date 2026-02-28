@@ -52,7 +52,8 @@
                     <div id="syncDot" class="w-2 h-2 rounded-full bg-gray-500"></div>
                     <span id="syncText" class="text-gray-400">...</span>
                 </div>
-                <button onclick="forceSyncToCloud()" class="px-2 py-1 bg-white/10 hover:bg-white/15 rounded text-xs text-gray-400" title="Force sync to cloud">Sync</button>
+                <button onclick="forceSyncToCloud()" class="px-2 py-1 bg-white/10 hover:bg-white/15 rounded text-xs text-gray-400" title="Sync to cloud">Sync</button>
+                <button onclick="promptForToken()" class="px-2 py-1 bg-white/10 hover:bg-white/15 rounded text-xs text-gray-400" title="Set GitHub token for cloud sync" id="connectBtn"></button>
                 <a href="broker_targets.json" download class="px-2 py-1 bg-white/10 hover:bg-white/15 rounded text-xs text-gray-400">JSON</a>
                 <a href="bay_area_all.json" download class="px-2 py-1 bg-white/10 hover:bg-white/15 rounded text-xs text-gray-400">All 2.3k</a>
             </div>
@@ -151,11 +152,13 @@
     </div>
 
     <script>
-    // --- Cloud-synced state (jsonblob.com + localStorage cache) ---
+    // --- Cloud-synced state (GitHub Gist + localStorage cache) ---
     const STORE_KEY = 'sf_leads_tracker';
     const LOG_KEY = 'sf_leads_log';
-    const BLOB_ID = '019ca1c8-6379-733c-9cfb-3165890721cc';
-    const BLOB_URL = `https://jsonblob.com/api/jsonBlob/${BLOB_ID}`;
+    const TOKEN_KEY = 'sf_leads_gh_token';
+    const GIST_ID = '992684f2ebb8c06c64ca74c575d2226b';
+    const GIST_FILE = 'state.json';
+    const GIST_API = `https://api.github.com/gists/${GIST_ID}`;
 
     const STATUS_COLORS = { new:'status-new', contacted:'status-contacted', invited:'status-invited', confirmed:'status-confirmed', declined:'status-declined', not_interested:'status-not_interested' };
     const STATUS_LABELS = { new:'New', contacted:'Contacted', invited:'Invited', confirmed:'Confirmed', declined:'Declined', not_interested:'Not Interested' };
@@ -169,7 +172,10 @@
     let currentTab = 'leads';
     let debounceTimer = null;
     let syncTimer = null;
-    let cloudLoaded = false;
+
+    // -- Token management --
+    function getToken() { return localStorage.getItem(TOKEN_KEY) || ''; }
+    function setToken(t) { localStorage.setItem(TOKEN_KEY, t); }
 
     // -- Local state (instant reads) --
     function getState() {
@@ -190,7 +196,7 @@
         scheduleSyncToCloud();
     }
 
-    // -- Cloud sync --
+    // -- Cloud sync via GitHub Gist --
     function setSyncStatus(status, color) {
         const dot = document.getElementById('syncDot');
         const txt = document.getElementById('syncText');
@@ -201,65 +207,70 @@
     async function loadFromCloud() {
         try {
             setSyncStatus('Syncing...', 'bg-yellow-400 animate-pulse');
-            const resp = await fetch(BLOB_URL, { headers: { 'Accept': 'application/json' } });
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            const cloud = await resp.json();
+            const headers = { 'Accept': 'application/vnd.github+json' };
+            const token = getToken();
+            if (token) headers['Authorization'] = `Bearer ${token}`;
 
-            // Merge: cloud wins for any key that exists in cloud but not local,
-            // local wins for anything modified more recently (by timestamp)
+            const resp = await fetch(GIST_API, { headers });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const gist = await resp.json();
+            const content = gist.files?.[GIST_FILE]?.content;
+            if (!content) { setSyncStatus('Synced', 'bg-green-400'); return; }
+
+            const cloud = JSON.parse(content);
+
             if (cloud.leads && Object.keys(cloud.leads).length > 0) {
                 const local = getState();
                 const localLog = getLog();
                 const cloudLog = cloud.log || [];
 
-                // If local is empty, just use cloud
                 if (Object.keys(local).length === 0) {
                     localStorage.setItem(STORE_KEY, JSON.stringify(cloud.leads));
-                    if (cloudLog.length > localLog.length) {
-                        localStorage.setItem(LOG_KEY, JSON.stringify(cloudLog));
-                    }
+                    if (cloudLog.length > localLog.length) localStorage.setItem(LOG_KEY, JSON.stringify(cloudLog));
                 } else {
-                    // Merge: take whichever has more data per key
                     const merged = { ...cloud.leads };
                     for (const [k, v] of Object.entries(local)) {
                         if (!merged[k]) { merged[k] = v; }
                         else {
-                            // If local has a non-default status and cloud is still 'new', local wins
                             if (v.status !== 'new' && merged[k].status === 'new') merged[k] = v;
-                            // If local has notes and cloud doesn't, local wins
                             if (v.notes && !merged[k].notes) merged[k].notes = v.notes;
                             if (v.dinner_rsvp && !merged[k].dinner_rsvp) merged[k].dinner_rsvp = v.dinner_rsvp;
                         }
                     }
                     localStorage.setItem(STORE_KEY, JSON.stringify(merged));
-                    // Merge logs: combine, dedupe by timestamp, sort desc
                     const allLogs = [...localLog, ...cloudLog];
                     const seen = new Set();
-                    const dedupedLog = allLogs.filter(l => {
-                        const key = l.ts + l.name + l.action;
-                        if (seen.has(key)) return false;
-                        seen.add(key); return true;
-                    }).sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 500);
+                    const dedupedLog = allLogs.filter(l => { const key = l.ts+l.name+l.action; if (seen.has(key)) return false; seen.add(key); return true; })
+                        .sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 500);
                     localStorage.setItem(LOG_KEY, JSON.stringify(dedupedLog));
                 }
             }
-            cloudLoaded = true;
             setSyncStatus('Synced', 'bg-green-400');
         } catch (e) {
             console.warn('Cloud load failed:', e);
-            setSyncStatus('Offline', 'bg-gray-500');
+            setSyncStatus('Local only', 'bg-gray-500');
         }
     }
 
     async function syncToCloud() {
+        const token = getToken();
+        if (!token) { setSyncStatus('No token', 'bg-gray-500'); return; }
         try {
             setSyncStatus('Saving...', 'bg-yellow-400 animate-pulse');
             const payload = { leads: getState(), log: getLog() };
-            const resp = await fetch(BLOB_URL, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-                body: JSON.stringify(payload)
+            const resp = await fetch(GIST_API, {
+                method: 'PATCH',
+                headers: {
+                    'Accept': 'application/vnd.github+json',
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ files: { [GIST_FILE]: { content: JSON.stringify(payload) } } })
             });
+            if (resp.status === 401 || resp.status === 403) {
+                setSyncStatus('Bad token', 'bg-red-400');
+                return;
+            }
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             setSyncStatus('Synced', 'bg-green-400');
         } catch (e) {
@@ -269,15 +280,32 @@
     }
 
     function scheduleSyncToCloud() {
-        // Debounce: sync 2s after last change
         clearTimeout(syncTimer);
-        setSyncStatus('Unsaved', 'bg-yellow-400');
-        syncTimer = setTimeout(syncToCloud, 2000);
+        if (getToken()) {
+            setSyncStatus('Unsaved', 'bg-yellow-400');
+            syncTimer = setTimeout(syncToCloud, 2000);
+        }
     }
 
     async function forceSyncToCloud() {
+        if (!getToken()) { promptForToken(); return; }
         clearTimeout(syncTimer);
         await syncToCloud();
+    }
+
+    function promptForToken() {
+        const existing = getToken();
+        const token = prompt(
+            'Enter a GitHub Personal Access Token (with "gist" scope) to enable cloud sync.\n\n' +
+            'Create one at: github.com/settings/tokens → Fine-grained → Gists only\n\n' +
+            'Your token is stored only in this browser, never sent anywhere except GitHub.',
+            existing
+        );
+        if (token !== null) {
+            setToken(token.trim());
+            if (token.trim()) syncToCloud();
+            else setSyncStatus('No token', 'bg-gray-500');
+        }
     }
 
     function getLeadState(id) {
@@ -316,6 +344,9 @@
         allData = a;
         renderLeads();
         updateHeader();
+        // Update connect button label
+        const cb = document.getElementById('connectBtn');
+        if (cb) cb.textContent = getToken() ? 'Connected' : 'Connect';
     }
 
     // --- Filtering ---
