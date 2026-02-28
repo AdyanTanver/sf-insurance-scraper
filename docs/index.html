@@ -47,9 +47,13 @@
         </div>
         <div class="flex items-center gap-4">
             <div id="headerStats" class="flex gap-4 text-sm text-gray-400"></div>
-            <div class="flex gap-2">
+            <div class="flex items-center gap-2">
+                <div id="syncIndicator" class="flex items-center gap-1.5 px-2 py-1 rounded text-xs">
+                    <div id="syncDot" class="w-2 h-2 rounded-full bg-gray-500"></div>
+                    <span id="syncText" class="text-gray-400">...</span>
+                </div>
+                <button onclick="forceSyncToCloud()" class="px-2 py-1 bg-white/10 hover:bg-white/15 rounded text-xs text-gray-400" title="Force sync to cloud">Sync</button>
                 <a href="broker_targets.json" download class="px-2 py-1 bg-white/10 hover:bg-white/15 rounded text-xs text-gray-400">JSON</a>
-                <a href="sf_enriched.json" download class="px-2 py-1 bg-white/10 hover:bg-white/15 rounded text-xs text-gray-400">SF Data</a>
                 <a href="bay_area_all.json" download class="px-2 py-1 bg-white/10 hover:bg-white/15 rounded text-xs text-gray-400">All 2.3k</a>
             </div>
         </div>
@@ -147,27 +151,33 @@
     </div>
 
     <script>
-    // --- localStorage-backed state ---
+    // --- Cloud-synced state (jsonblob.com + localStorage cache) ---
     const STORE_KEY = 'sf_leads_tracker';
     const LOG_KEY = 'sf_leads_log';
+    const BLOB_ID = '019ca1c8-6379-733c-9cfb-3165890721cc';
+    const BLOB_URL = `https://jsonblob.com/api/jsonBlob/${BLOB_ID}`;
 
     const STATUS_COLORS = { new:'status-new', contacted:'status-contacted', invited:'status-invited', confirmed:'status-confirmed', declined:'status-declined', not_interested:'status-not_interested' };
     const STATUS_LABELS = { new:'New', contacted:'Contacted', invited:'Invited', confirmed:'Confirmed', declined:'Declined', not_interested:'Not Interested' };
     const TYPE_LABELS = { independent:'Independent', large_brokerage:'Large Brokerage', captive_agent:'Captive Agent' };
     const STATUSES = ['new','contacted','invited','confirmed','declined','not_interested'];
 
-    let leads = [];       // broker targets with tracker state
-    let sfData = [];      // sf enriched
-    let allData = [];     // all bay area
+    let leads = [];
+    let sfData = [];
+    let allData = [];
     let selectedIds = new Set();
     let currentTab = 'leads';
     let debounceTimer = null;
+    let syncTimer = null;
+    let cloudLoaded = false;
 
+    // -- Local state (instant reads) --
     function getState() {
         try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; }
     }
     function saveState(state) {
         localStorage.setItem(STORE_KEY, JSON.stringify(state));
+        scheduleSyncToCloud();
     }
     function getLog() {
         try { return JSON.parse(localStorage.getItem(LOG_KEY)) || []; } catch { return []; }
@@ -177,6 +187,97 @@
         log.unshift({ name: leadName, action, details, ts: new Date().toISOString() });
         if (log.length > 500) log.length = 500;
         localStorage.setItem(LOG_KEY, JSON.stringify(log));
+        scheduleSyncToCloud();
+    }
+
+    // -- Cloud sync --
+    function setSyncStatus(status, color) {
+        const dot = document.getElementById('syncDot');
+        const txt = document.getElementById('syncText');
+        if (dot) dot.className = `w-2 h-2 rounded-full ${color}`;
+        if (txt) txt.textContent = status;
+    }
+
+    async function loadFromCloud() {
+        try {
+            setSyncStatus('Syncing...', 'bg-yellow-400 animate-pulse');
+            const resp = await fetch(BLOB_URL, { headers: { 'Accept': 'application/json' } });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const cloud = await resp.json();
+
+            // Merge: cloud wins for any key that exists in cloud but not local,
+            // local wins for anything modified more recently (by timestamp)
+            if (cloud.leads && Object.keys(cloud.leads).length > 0) {
+                const local = getState();
+                const localLog = getLog();
+                const cloudLog = cloud.log || [];
+
+                // If local is empty, just use cloud
+                if (Object.keys(local).length === 0) {
+                    localStorage.setItem(STORE_KEY, JSON.stringify(cloud.leads));
+                    if (cloudLog.length > localLog.length) {
+                        localStorage.setItem(LOG_KEY, JSON.stringify(cloudLog));
+                    }
+                } else {
+                    // Merge: take whichever has more data per key
+                    const merged = { ...cloud.leads };
+                    for (const [k, v] of Object.entries(local)) {
+                        if (!merged[k]) { merged[k] = v; }
+                        else {
+                            // If local has a non-default status and cloud is still 'new', local wins
+                            if (v.status !== 'new' && merged[k].status === 'new') merged[k] = v;
+                            // If local has notes and cloud doesn't, local wins
+                            if (v.notes && !merged[k].notes) merged[k].notes = v.notes;
+                            if (v.dinner_rsvp && !merged[k].dinner_rsvp) merged[k].dinner_rsvp = v.dinner_rsvp;
+                        }
+                    }
+                    localStorage.setItem(STORE_KEY, JSON.stringify(merged));
+                    // Merge logs: combine, dedupe by timestamp, sort desc
+                    const allLogs = [...localLog, ...cloudLog];
+                    const seen = new Set();
+                    const dedupedLog = allLogs.filter(l => {
+                        const key = l.ts + l.name + l.action;
+                        if (seen.has(key)) return false;
+                        seen.add(key); return true;
+                    }).sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, 500);
+                    localStorage.setItem(LOG_KEY, JSON.stringify(dedupedLog));
+                }
+            }
+            cloudLoaded = true;
+            setSyncStatus('Synced', 'bg-green-400');
+        } catch (e) {
+            console.warn('Cloud load failed:', e);
+            setSyncStatus('Offline', 'bg-gray-500');
+        }
+    }
+
+    async function syncToCloud() {
+        try {
+            setSyncStatus('Saving...', 'bg-yellow-400 animate-pulse');
+            const payload = { leads: getState(), log: getLog() };
+            const resp = await fetch(BLOB_URL, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            setSyncStatus('Synced', 'bg-green-400');
+        } catch (e) {
+            console.warn('Cloud save failed:', e);
+            setSyncStatus('Save failed', 'bg-red-400');
+        }
+    }
+
+    function scheduleSyncToCloud() {
+        // Debounce: sync 2s after last change
+        clearTimeout(syncTimer);
+        setSyncStatus('Unsaved', 'bg-yellow-400');
+        syncTimer = setTimeout(syncToCloud, 2000);
+    }
+
+    async function forceSyncToCloud() {
+        clearTimeout(syncTimer);
+        await syncToCloud();
     }
 
     function getLeadState(id) {
@@ -193,6 +294,9 @@
     }
 
     async function loadData() {
+        // Load cloud state first, then merge with local
+        await loadFromCloud();
+
         const [t, s, a] = await Promise.all([
             fetch('broker_targets.json').then(r => r.json()),
             fetch('sf_enriched.json').then(r => r.json()),
