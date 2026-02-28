@@ -1,0 +1,34 @@
+SF Bay Area Commercial Insurance Scrape Summary
+==================================================
+
+Total unique companies: 2291
+
+By Source:
+  CDI Admitted Insurers: 1298
+  Google Maps: 993
+
+By City:
+  Unknown: 1298
+  SF Sunset: 80
+  SF SOMA: 73
+  Palo Alto: 64
+  SF Downtown: 63
+  SF Mission: 62
+  Oakland Downtown: 58
+  San Jose Downtown: 56
+  Fremont: 54
+  Berkeley: 53
+  San Mateo: 52
+  Sunnyvale: 52
+  Concord: 50
+  San Rafael: 50
+  Daly City: 48
+  Hayward: 48
+  Walnut Creek: 46
+  Pleasanton: 45
+  Redwood City: 39
+
+Companies with phone: 983
+Companies with website: 0
+Companies with email: 0
+Companies with rating: 49

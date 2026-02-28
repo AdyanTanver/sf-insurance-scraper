@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SF Insurance Broker Database</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { theme: { extend: { colors: { dark: { 800: '#1a1a2e', 900: '#0f0f1a', 700: '#252540' } } } } }
+    </script>
+    <style>
+        body { background: #0f0f1a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+        .glass { background: rgba(30, 30, 60, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.08); }
+        .btn-linkedin { background: #0a66c2; }
+        .btn-linkedin:hover { background: #004182; }
+        input, select { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #e0e0e0; }
+        input:focus, select:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,0.2); }
+        .tab-active { border-bottom: 2px solid #6366f1; color: #fff; }
+        .tab-inactive { color: #777; }
+        .tab-inactive:hover { color: #aaa; }
+        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        .type-independent { background: #1a3d2e; color: #34d399; }
+        .type-large_brokerage { background: #1e3a5f; color: #60a5fa; }
+        .type-captive_agent { background: #2a2a2a; color: #9ca3af; }
+        .badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 9999px; font-weight: 500; white-space: nowrap; }
+        .lead-row:hover { background: rgba(255,255,255,0.04); }
+        .stat-card { transition: transform 0.15s; } .stat-card:hover { transform: translateY(-2px); }
+        .modal-overlay { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+    </style>
+</head>
+<body class="min-h-screen">
+    <header class="glass sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
+        <div>
+            <h1 class="text-xl font-bold text-white">SF Insurance Broker Database</h1>
+            <span class="text-xs text-gray-500">2,291 Bay Area companies | 278 SF enriched | 133 broker targets</span>
+        </div>
+        <div class="flex gap-2">
+            <a href="sf_enriched.json" download class="px-3 py-1.5 bg-white/10 hover:bg-white/15 rounded-lg text-xs text-gray-300">Download SF JSON</a>
+            <a href="broker_targets.json" download class="px-3 py-1.5 bg-white/10 hover:bg-white/15 rounded-lg text-xs text-gray-300">Download Targets JSON</a>
+            <a href="bay_area_all.json" download class="px-3 py-1.5 bg-white/10 hover:bg-white/15 rounded-lg text-xs text-gray-300">Download All JSON</a>
+        </div>
+    </header>
+
+    <div class="px-6 pt-4 flex gap-6 border-b border-white/5">
+        <button onclick="switchTab('targets')" id="tab-targets" class="pb-3 text-sm font-medium tab-active">Broker Targets (133)</button>
+        <button onclick="switchTab('sf')" id="tab-sf" class="pb-3 text-sm font-medium tab-inactive">SF Enriched (278)</button>
+        <button onclick="switchTab('all')" id="tab-all" class="pb-3 text-sm font-medium tab-inactive">All Bay Area (2,291)</button>
+        <button onclick="switchTab('stats')" id="tab-stats" class="pb-3 text-sm font-medium tab-inactive">Stats</button>
+    </div>
+
+    <main class="px-6 py-4">
+        <!-- Filters -->
+        <div class="flex flex-wrap gap-3 mb-4 items-center">
+            <input type="text" id="searchInput" placeholder="Search..." class="px-3 py-2 rounded-lg text-sm w-64" oninput="debounceRender()">
+            <select id="typeFilter" class="px-3 py-2 rounded-lg text-sm" onchange="renderTable()">
+                <option value="">All Types</option>
+                <option value="independent">Independent</option>
+                <option value="large_brokerage">Large Brokerage</option>
+                <option value="captive_agent">Captive Agent</option>
+            </select>
+            <select id="emailFilter" class="px-3 py-2 rounded-lg text-sm" onchange="renderTable()">
+                <option value="">Email: Any</option>
+                <option value="yes">Has Email</option>
+                <option value="no">No Email</option>
+            </select>
+            <div class="flex-1"></div>
+            <span id="resultCount" class="text-xs text-gray-500"></span>
+        </div>
+
+        <div id="tableContainer" class="glass rounded-xl overflow-hidden">
+            <div class="p-12 text-center text-gray-500">Loading data...</div>
+        </div>
+
+        <!-- Stats view -->
+        <div id="statsView" class="hidden"></div>
+    </main>
+
+    <!-- Detail Modal -->
+    <div id="modal" class="fixed inset-0 z-50 hidden items-center justify-center modal-overlay" onclick="if(event.target===this){closeModal()}">
+        <div class="glass rounded-2xl w-full max-w-2xl mx-4 max-h-[85vh] overflow-y-auto">
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+    let data = { targets: [], sf: [], all: [] };
+    let currentTab = 'targets';
+    let debounceTimer = null;
+
+    const TYPE_LABELS = { independent: 'Independent', large_brokerage: 'Large Brokerage', captive_agent: 'Captive Agent' };
+
+    async function loadData() {
+        const [t, s, a] = await Promise.all([
+            fetch('broker_targets.json').then(r => r.json()),
+            fetch('sf_enriched.json').then(r => r.json()),
+            fetch('bay_area_all.json').then(r => r.json())
+        ]);
+        data.targets = t;
+        data.sf = s;
+        data.all = a;
+        renderTable();
+    }
+
+    function getCurrentData() {
+        return data[currentTab] || [];
+    }
+
+    function filterData(rows) {
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        const typeF = document.getElementById('typeFilter').value;
+        const emailF = document.getElementById('emailFilter').value;
+
+        return rows.filter(r => {
+            if (search) {
+                const hay = `${r.name} ${r.email || ''} ${r.phone || ''} ${r.address || ''} ${r.type || ''}`.toLowerCase();
+                if (!hay.includes(search)) return false;
+            }
+            if (typeF && r.type !== typeF) return false;
+            if (emailF === 'yes' && !r.email) return false;
+            if (emailF === 'no' && r.email) return false;
+            return true;
+        });
+    }
+
+    function debounceRender() {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(renderTable, 200);
+    }
+
+    function renderTable() {
+        if (currentTab === 'stats') { renderStats(); return; }
+
+        const raw = getCurrentData();
+        const rows = filterData(raw);
+        document.getElementById('resultCount').textContent = `${rows.length} of ${raw.length}`;
+
+        const isTargets = currentTab === 'targets';
+        const isAll = currentTab === 'all';
+
+        let html = `<table class="w-full text-sm">
+        <thead><tr class="border-b border-white/5 text-left text-gray-400 text-xs uppercase tracking-wider">
+            <th class="px-4 py-3">Name</th>
+            ${isTargets ? '<th class="px-4 py-3">Type</th>' : ''}
+            ${isAll ? '<th class="px-4 py-3">City</th>' : ''}
+            <th class="px-4 py-3">Phone</th>
+            <th class="px-4 py-3">Email</th>
+            <th class="px-4 py-3">Links</th>
+        </tr></thead><tbody>`;
+
+        if (rows.length === 0) {
+            html += `<tr><td colspan="6" class="px-4 py-12 text-center text-gray-500">No results</td></tr>`;
+        } else {
+            rows.forEach((r, i) => {
+                const linkedinUrl = r.linkedin_search || `https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(r.name + ' San Francisco')}`;
+                html += `
+                <tr class="lead-row border-b border-white/5 cursor-pointer" onclick="openDetail(${i})">
+                    <td class="px-4 py-3">
+                        <div class="font-medium text-white">${esc(r.name)}</div>
+                        <div class="text-xs text-gray-500 mt-0.5">${esc(r.address || '')}</div>
+                    </td>
+                    ${isTargets ? `<td class="px-4 py-3"><span class="badge type-${r.type || ''}">${TYPE_LABELS[r.type] || r.type || ''}</span></td>` : ''}
+                    ${isAll ? `<td class="px-4 py-3 text-xs text-gray-400">${esc(r.city || '')}</td>` : ''}
+                    <td class="px-4 py-3 text-xs">${r.phone ? `<a href="tel:${r.phone}" class="text-blue-400 hover:underline" onclick="event.stopPropagation()">${esc(r.phone)}</a>` : '<span class="text-gray-600">--</span>'}</td>
+                    <td class="px-4 py-3 text-xs">${r.email ? `<a href="mailto:${r.email}" class="text-blue-400 hover:underline" onclick="event.stopPropagation()">${esc(r.email)}</a>` : '<span class="text-gray-600">--</span>'}</td>
+                    <td class="px-4 py-3" onclick="event.stopPropagation()">
+                        <div class="flex flex-col gap-1">
+                            ${r.website ? `<a href="${r.website}" target="_blank" class="bg-emerald-700 hover:bg-emerald-800 px-2 py-1 rounded text-xs text-white text-center">Website</a>` : ''}
+                            <a href="${linkedinUrl}" target="_blank" class="btn-linkedin px-2 py-1 rounded text-xs text-white text-center">LinkedIn</a>
+                        </div>
+                    </td>
+                </tr>`;
+            });
+        }
+
+        html += '</tbody></table>';
+        document.getElementById('tableContainer').innerHTML = html;
+        document.getElementById('tableContainer').classList.remove('hidden');
+        document.getElementById('statsView').classList.add('hidden');
+    }
+
+    function openDetail(idx) {
+        const rows = filterData(getCurrentData());
+        const r = rows[idx];
+        if (!r) return;
+
+        const linkedinUrl = r.linkedin_search || `https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(r.name + ' San Francisco')}`;
+        const linkedinPeople = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(r.name + ' San Francisco')}`;
+
+        document.getElementById('modalContent').innerHTML = `
+        <div class="p-6">
+            <div class="flex items-start justify-between mb-6">
+                <div>
+                    <h2 class="text-xl font-bold text-white">${esc(r.name)}</h2>
+                    ${r.type ? `<span class="badge type-${r.type} mt-1 inline-block">${TYPE_LABELS[r.type] || r.type}</span>` : ''}
+                    ${r.city ? `<span class="text-xs text-gray-500 ml-2">${esc(r.city)}</span>` : ''}
+                </div>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
+            </div>
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="glass rounded-lg p-3">
+                    <div class="text-xs text-gray-400 mb-1">Phone</div>
+                    <div>${r.phone ? `<a href="tel:${r.phone}" class="text-blue-400">${esc(r.phone)}</a>` : '--'}</div>
+                </div>
+                <div class="glass rounded-lg p-3">
+                    <div class="text-xs text-gray-400 mb-1">Email</div>
+                    <div>${r.email ? `<a href="mailto:${r.email}" class="text-blue-400">${esc(r.email)}</a>` : '--'}</div>
+                </div>
+                <div class="glass rounded-lg p-3">
+                    <div class="text-xs text-gray-400 mb-1">Website</div>
+                    <div>${r.website ? `<a href="${r.website}" target="_blank" class="text-blue-400 break-all text-sm">${esc(r.website)}</a>` : '--'}</div>
+                </div>
+                <div class="glass rounded-lg p-3">
+                    <div class="text-xs text-gray-400 mb-1">Address</div>
+                    <div class="text-sm">${esc(r.address || '--')}</div>
+                </div>
+            </div>
+            ${r.rating ? `<div class="glass rounded-lg p-3 mb-6"><div class="text-xs text-gray-400 mb-1">Rating</div><div>${esc(r.rating)}</div></div>` : ''}
+            ${r.categories ? `<div class="glass rounded-lg p-3 mb-6"><div class="text-xs text-gray-400 mb-1">Categories</div><div class="text-sm">${esc(r.categories)}</div></div>` : ''}
+            <div class="flex gap-3">
+                ${r.website ? `<a href="${r.website}" target="_blank" class="bg-emerald-700 hover:bg-emerald-800 px-4 py-2 rounded-lg text-sm text-white flex-1 text-center">Visit Website</a>` : ''}
+                <a href="${linkedinUrl}" target="_blank" class="btn-linkedin px-4 py-2 rounded-lg text-sm text-white flex-1 text-center">Search LinkedIn</a>
+                <a href="${linkedinPeople}" target="_blank" class="bg-blue-800 hover:bg-blue-900 px-4 py-2 rounded-lg text-sm text-white flex-1 text-center">Find People</a>
+            </div>
+        </div>`;
+        document.getElementById('modal').classList.remove('hidden');
+        document.getElementById('modal').classList.add('flex');
+    }
+
+    function closeModal() {
+        document.getElementById('modal').classList.add('hidden');
+        document.getElementById('modal').classList.remove('flex');
+    }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+    function switchTab(tab) {
+        currentTab = tab;
+        ['targets', 'sf', 'all', 'stats'].forEach(t => {
+            const el = document.getElementById(`tab-${t}`);
+            if (el) el.className = t === tab ? 'pb-3 text-sm font-medium tab-active' : 'pb-3 text-sm font-medium tab-inactive';
+        });
+
+        // Show/hide type filter (only for targets)
+        document.getElementById('typeFilter').style.display = tab === 'targets' ? '' : 'none';
+
+        if (tab === 'stats') {
+            renderStats();
+        } else {
+            renderTable();
+        }
+    }
+
+    function renderStats() {
+        document.getElementById('tableContainer').classList.add('hidden');
+        const sv = document.getElementById('statsView');
+        sv.classList.remove('hidden');
+
+        const sf = data.sf;
+        const targets = data.targets;
+        const all = data.all;
+
+        const withEmail = sf.filter(r => r.email).length;
+        const withWebsite = sf.filter(r => r.website).length;
+        const withPhone = sf.filter(r => r.phone).length;
+        const indep = targets.filter(r => r.type === 'independent').length;
+        const large = targets.filter(r => r.type === 'large_brokerage').length;
+        const captive = targets.filter(r => r.type === 'captive_agent').length;
+
+        // City distribution from all data
+        const cities = {};
+        all.forEach(r => { const c = r.city || 'Unknown'; cities[c] = (cities[c] || 0) + 1; });
+        const topCities = Object.entries(cities).sort((a,b) => b[1] - a[1]).slice(0, 15);
+
+        sv.innerHTML = `
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="glass rounded-xl p-5 stat-card">
+                <div class="text-3xl font-bold text-white">${all.length.toLocaleString()}</div>
+                <div class="text-sm text-gray-400 mt-1">Total Bay Area Companies</div>
+            </div>
+            <div class="glass rounded-xl p-5 stat-card">
+                <div class="text-3xl font-bold text-indigo-400">${sf.length}</div>
+                <div class="text-sm text-gray-400 mt-1">SF Enriched</div>
+            </div>
+            <div class="glass rounded-xl p-5 stat-card">
+                <div class="text-3xl font-bold text-green-400">${targets.length}</div>
+                <div class="text-sm text-gray-400 mt-1">Broker Targets</div>
+            </div>
+            <div class="glass rounded-xl p-5 stat-card">
+                <div class="text-3xl font-bold text-yellow-400">${withEmail}</div>
+                <div class="text-sm text-gray-400 mt-1">SF With Email</div>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+            <div class="glass rounded-xl p-5">
+                <h3 class="text-sm font-medium text-white mb-4">SF Enrichment Coverage</h3>
+                <div class="space-y-3">
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm text-gray-400 w-24">Phone</span>
+                        <div class="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><div class="h-full bg-blue-500 rounded-full" style="width: ${Math.round(withPhone/sf.length*100)}%"></div></div>
+                        <span class="text-sm text-gray-400 w-16 text-right">${withPhone} (${Math.round(withPhone/sf.length*100)}%)</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm text-gray-400 w-24">Website</span>
+                        <div class="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><div class="h-full bg-emerald-500 rounded-full" style="width: ${Math.round(withWebsite/sf.length*100)}%"></div></div>
+                        <span class="text-sm text-gray-400 w-16 text-right">${withWebsite} (${Math.round(withWebsite/sf.length*100)}%)</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm text-gray-400 w-24">Email</span>
+                        <div class="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><div class="h-full bg-yellow-500 rounded-full" style="width: ${Math.round(withEmail/sf.length*100)}%"></div></div>
+                        <span class="text-sm text-gray-400 w-16 text-right">${withEmail} (${Math.round(withEmail/sf.length*100)}%)</span>
+                    </div>
+                </div>
+            </div>
+            <div class="glass rounded-xl p-5">
+                <h3 class="text-sm font-medium text-white mb-4">Broker Target Types</h3>
+                <div class="space-y-3">
+                    <div class="flex items-center gap-3">
+                        <span class="badge type-independent w-32 text-center">Independent</span>
+                        <div class="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><div class="h-full bg-green-500 rounded-full" style="width: ${Math.round(indep/targets.length*100)}%"></div></div>
+                        <span class="text-sm text-gray-400 w-8 text-right">${indep}</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="badge type-large_brokerage w-32 text-center">Large Brokerage</span>
+                        <div class="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><div class="h-full bg-blue-500 rounded-full" style="width: ${Math.round(large/targets.length*100)}%"></div></div>
+                        <span class="text-sm text-gray-400 w-8 text-right">${large}</span>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="badge type-captive_agent w-32 text-center">Captive Agent</span>
+                        <div class="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><div class="h-full bg-gray-500 rounded-full" style="width: ${Math.round(captive/targets.length*100)}%"></div></div>
+                        <span class="text-sm text-gray-400 w-8 text-right">${captive}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="glass rounded-xl p-5">
+            <h3 class="text-sm font-medium text-white mb-4">Top Cities (All Bay Area)</h3>
+            <div class="space-y-2">
+                ${topCities.map(([city, count]) => `
+                <div class="flex items-center gap-3">
+                    <span class="text-sm text-gray-400 w-36">${esc(city)}</span>
+                    <div class="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><div class="h-full bg-indigo-500 rounded-full" style="width: ${Math.round(count/all.length*100*5)}%"></div></div>
+                    <span class="text-sm text-gray-400 w-12 text-right">${count}</span>
+                </div>`).join('')}
+            </div>
+        </div>`;
+    }
+
+    function esc(s) {
+        if (!s) return '';
+        const d = document.createElement('div');
+        d.textContent = s;
+        return d.innerHTML;
+    }
+
+    loadData();
+    </script>
+</body>
+</html>
