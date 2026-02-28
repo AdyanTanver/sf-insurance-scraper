@@ -3,91 +3,194 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SF Insurance Broker Database</title>
+    <title>SF Insurance Broker Leads</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = { theme: { extend: { colors: { dark: { 800: '#1a1a2e', 900: '#0f0f1a', 700: '#252540' } } } } }
-    </script>
     <style>
         body { background: #0f0f1a; color: #e0e0e0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
         .glass { background: rgba(30, 30, 60, 0.7); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.08); }
-        .btn-linkedin { background: #0a66c2; }
-        .btn-linkedin:hover { background: #004182; }
-        input, select { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #e0e0e0; }
-        input:focus, select:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,0.2); }
-        .tab-active { border-bottom: 2px solid #6366f1; color: #fff; }
-        .tab-inactive { color: #777; }
-        .tab-inactive:hover { color: #aaa; }
-        ::-webkit-scrollbar { width: 6px; } ::-webkit-scrollbar-track { background: transparent; } ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        .status-new { background: #1e3a5f; color: #60a5fa; }
+        .status-contacted { background: #3b3520; color: #fbbf24; }
+        .status-invited { background: #2d1f5e; color: #a78bfa; }
+        .status-confirmed { background: #1a3d2e; color: #34d399; }
+        .status-declined { background: #3d1a1a; color: #f87171; }
+        .status-not_interested { background: #2a2a2a; color: #9ca3af; }
         .type-independent { background: #1a3d2e; color: #34d399; }
         .type-large_brokerage { background: #1e3a5f; color: #60a5fa; }
         .type-captive_agent { background: #2a2a2a; color: #9ca3af; }
-        .badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 9999px; font-weight: 500; white-space: nowrap; }
         .lead-row:hover { background: rgba(255,255,255,0.04); }
-        .stat-card { transition: transform 0.15s; } .stat-card:hover { transform: translateY(-2px); }
+        .lead-row.selected { background: rgba(99,102,241,0.15); border-left: 3px solid #6366f1; }
+        .btn-linkedin { background: #0a66c2; }
+        .btn-linkedin:hover { background: #004182; }
+        input, select, textarea { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); color: #e0e0e0; }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 2px rgba(99,102,241,0.2); }
+        .tab-active { border-bottom: 2px solid #6366f1; color: #fff; }
+        .tab-inactive { color: #777; cursor: pointer; }
+        .tab-inactive:hover { color: #aaa; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        .stat-card { transition: transform 0.15s; }
+        .stat-card:hover { transform: translateY(-2px); }
         .modal-overlay { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+        .badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 9999px; font-weight: 500; white-space: nowrap; }
+        .checkmark { width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.2); border-radius: 4px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .checkmark.checked { background: #6366f1; border-color: #6366f1; }
+        .pipeline-col { min-height: 200px; }
     </style>
 </head>
 <body class="min-h-screen">
+    <!-- Header -->
     <header class="glass sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
-        <div>
-            <h1 class="text-xl font-bold text-white">SF Insurance Broker Database</h1>
-            <span class="text-xs text-gray-500">2,291 Bay Area companies | 278 SF enriched | 133 broker targets</span>
+        <div class="flex items-center gap-4">
+            <h1 class="text-xl font-bold text-white">SF Insurance Broker Leads</h1>
+            <span class="text-xs text-gray-500">Private Dinner Outreach</span>
         </div>
-        <div class="flex gap-2">
-            <a href="sf_enriched.json" download class="px-3 py-1.5 bg-white/10 hover:bg-white/15 rounded-lg text-xs text-gray-300">Download SF JSON</a>
-            <a href="broker_targets.json" download class="px-3 py-1.5 bg-white/10 hover:bg-white/15 rounded-lg text-xs text-gray-300">Download Targets JSON</a>
-            <a href="bay_area_all.json" download class="px-3 py-1.5 bg-white/10 hover:bg-white/15 rounded-lg text-xs text-gray-300">Download All JSON</a>
+        <div class="flex items-center gap-4">
+            <div id="headerStats" class="flex gap-4 text-sm text-gray-400"></div>
+            <div class="flex gap-2">
+                <a href="broker_targets.json" download class="px-2 py-1 bg-white/10 hover:bg-white/15 rounded text-xs text-gray-400">JSON</a>
+                <a href="sf_enriched.json" download class="px-2 py-1 bg-white/10 hover:bg-white/15 rounded text-xs text-gray-400">SF Data</a>
+                <a href="bay_area_all.json" download class="px-2 py-1 bg-white/10 hover:bg-white/15 rounded text-xs text-gray-400">All 2.3k</a>
+            </div>
         </div>
     </header>
 
+    <!-- Tabs -->
     <div class="px-6 pt-4 flex gap-6 border-b border-white/5">
-        <button onclick="switchTab('targets')" id="tab-targets" class="pb-3 text-sm font-medium tab-active">Broker Targets (133)</button>
+        <button onclick="switchTab('leads')" id="tab-leads" class="pb-3 text-sm font-medium tab-active">All Leads</button>
+        <button onclick="switchTab('dashboard')" id="tab-dashboard" class="pb-3 text-sm font-medium tab-inactive">Dashboard</button>
+        <button onclick="switchTab('pipeline')" id="tab-pipeline" class="pb-3 text-sm font-medium tab-inactive">Pipeline</button>
         <button onclick="switchTab('sf')" id="tab-sf" class="pb-3 text-sm font-medium tab-inactive">SF Enriched (278)</button>
         <button onclick="switchTab('all')" id="tab-all" class="pb-3 text-sm font-medium tab-inactive">All Bay Area (2,291)</button>
-        <button onclick="switchTab('stats')" id="tab-stats" class="pb-3 text-sm font-medium tab-inactive">Stats</button>
     </div>
 
     <main class="px-6 py-4">
-        <!-- Filters -->
-        <div class="flex flex-wrap gap-3 mb-4 items-center">
-            <input type="text" id="searchInput" placeholder="Search..." class="px-3 py-2 rounded-lg text-sm w-64" oninput="debounceRender()">
-            <select id="typeFilter" class="px-3 py-2 rounded-lg text-sm" onchange="renderTable()">
-                <option value="">All Types</option>
-                <option value="independent">Independent</option>
-                <option value="large_brokerage">Large Brokerage</option>
-                <option value="captive_agent">Captive Agent</option>
-            </select>
-            <select id="emailFilter" class="px-3 py-2 rounded-lg text-sm" onchange="renderTable()">
-                <option value="">Email: Any</option>
-                <option value="yes">Has Email</option>
-                <option value="no">No Email</option>
-            </select>
-            <div class="flex-1"></div>
-            <span id="resultCount" class="text-xs text-gray-500"></span>
+        <!-- LEADS TAB -->
+        <div id="view-leads">
+            <div class="flex flex-wrap gap-3 mb-4 items-center">
+                <input type="text" id="searchInput" placeholder="Search leads..." class="px-3 py-2 rounded-lg text-sm w-64" oninput="debounceRender()">
+                <select id="statusFilter" class="px-3 py-2 rounded-lg text-sm" onchange="renderLeads()">
+                    <option value="">All Statuses</option>
+                    <option value="new">New</option>
+                    <option value="contacted">Contacted</option>
+                    <option value="invited">Invited</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="declined">Declined</option>
+                    <option value="not_interested">Not Interested</option>
+                </select>
+                <select id="typeFilter" class="px-3 py-2 rounded-lg text-sm" onchange="renderLeads()">
+                    <option value="">All Types</option>
+                    <option value="independent">Independent</option>
+                    <option value="large_brokerage">Large Brokerage</option>
+                    <option value="captive_agent">Captive Agent</option>
+                </select>
+                <select id="emailFilter" class="px-3 py-2 rounded-lg text-sm" onchange="renderLeads()">
+                    <option value="">Email: Any</option>
+                    <option value="yes">Has Email</option>
+                    <option value="no">No Email</option>
+                </select>
+                <div class="flex-1"></div>
+                <div id="bulkActions" class="hidden items-center gap-2">
+                    <span id="selectedCount" class="text-sm text-gray-400"></span>
+                    <select id="bulkStatus" class="px-2 py-1 rounded text-sm">
+                        <option value="">Bulk Set Status...</option>
+                        <option value="contacted">Contacted</option>
+                        <option value="invited">Invited</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="declined">Declined</option>
+                        <option value="not_interested">Not Interested</option>
+                    </select>
+                    <button onclick="bulkUpdate()" class="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 rounded text-sm text-white">Apply</button>
+                </div>
+                <span id="leadCount" class="text-xs text-gray-500"></span>
+            </div>
+            <div class="glass rounded-xl overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-white/5 text-left text-gray-400 text-xs uppercase tracking-wider">
+                            <th class="px-4 py-3 w-8"><div class="checkmark" onclick="toggleSelectAll()" id="selectAll"></div></th>
+                            <th class="px-4 py-3">Name</th>
+                            <th class="px-4 py-3">Type</th>
+                            <th class="px-4 py-3">Contact</th>
+                            <th class="px-4 py-3">Status</th>
+                            <th class="px-4 py-3">Links</th>
+                            <th class="px-4 py-3">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leadsTable"></tbody>
+                </table>
+            </div>
         </div>
 
-        <div id="tableContainer" class="glass rounded-xl overflow-hidden">
-            <div class="p-12 text-center text-gray-500">Loading data...</div>
+        <!-- DASHBOARD TAB -->
+        <div id="view-dashboard" class="hidden"></div>
+
+        <!-- PIPELINE TAB -->
+        <div id="view-pipeline" class="hidden"></div>
+
+        <!-- SF TAB -->
+        <div id="view-sf" class="hidden">
+            <div class="glass rounded-xl overflow-hidden"><div id="sfTable" class="p-8 text-center text-gray-500">Loading...</div></div>
         </div>
 
-        <!-- Stats view -->
-        <div id="statsView" class="hidden"></div>
+        <!-- ALL TAB -->
+        <div id="view-all" class="hidden">
+            <div class="glass rounded-xl overflow-hidden"><div id="allTable" class="p-8 text-center text-gray-500">Loading...</div></div>
+        </div>
     </main>
 
     <!-- Detail Modal -->
-    <div id="modal" class="fixed inset-0 z-50 hidden items-center justify-center modal-overlay" onclick="if(event.target===this){closeModal()}">
+    <div id="modal" class="fixed inset-0 z-50 hidden items-center justify-center modal-overlay" onclick="if(event.target===this)closeModal()">
         <div class="glass rounded-2xl w-full max-w-2xl mx-4 max-h-[85vh] overflow-y-auto">
             <div id="modalContent"></div>
         </div>
     </div>
 
     <script>
-    let data = { targets: [], sf: [], all: [] };
-    let currentTab = 'targets';
+    // --- localStorage-backed state ---
+    const STORE_KEY = 'sf_leads_tracker';
+    const LOG_KEY = 'sf_leads_log';
+
+    const STATUS_COLORS = { new:'status-new', contacted:'status-contacted', invited:'status-invited', confirmed:'status-confirmed', declined:'status-declined', not_interested:'status-not_interested' };
+    const STATUS_LABELS = { new:'New', contacted:'Contacted', invited:'Invited', confirmed:'Confirmed', declined:'Declined', not_interested:'Not Interested' };
+    const TYPE_LABELS = { independent:'Independent', large_brokerage:'Large Brokerage', captive_agent:'Captive Agent' };
+    const STATUSES = ['new','contacted','invited','confirmed','declined','not_interested'];
+
+    let leads = [];       // broker targets with tracker state
+    let sfData = [];      // sf enriched
+    let allData = [];     // all bay area
+    let selectedIds = new Set();
+    let currentTab = 'leads';
     let debounceTimer = null;
 
-    const TYPE_LABELS = { independent: 'Independent', large_brokerage: 'Large Brokerage', captive_agent: 'Captive Agent' };
+    function getState() {
+        try { return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; } catch { return {}; }
+    }
+    function saveState(state) {
+        localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    }
+    function getLog() {
+        try { return JSON.parse(localStorage.getItem(LOG_KEY)) || []; } catch { return []; }
+    }
+    function addLog(leadName, action, details) {
+        const log = getLog();
+        log.unshift({ name: leadName, action, details, ts: new Date().toISOString() });
+        if (log.length > 500) log.length = 500;
+        localStorage.setItem(LOG_KEY, JSON.stringify(log));
+    }
+
+    function getLeadState(id) {
+        const s = getState();
+        return s[id] || { status: 'new', notes: '', dinner_rsvp: '', contacted_at: '', invited_at: '', confirmed_at: '' };
+    }
+    function setLeadState(id, updates) {
+        const s = getState();
+        s[id] = { ...getLeadState(id), ...updates };
+        saveState(s);
+    }
+    function makeId(lead) {
+        return (lead.name + '|' + (lead.phone || '')).replace(/\s+/g, '_').toLowerCase();
+    }
 
     async function loadData() {
         const [t, s, a] = await Promise.all([
@@ -95,26 +198,31 @@
             fetch('sf_enriched.json').then(r => r.json()),
             fetch('bay_area_all.json').then(r => r.json())
         ]);
-        data.targets = t;
-        data.sf = s;
-        data.all = a;
-        renderTable();
+        leads = t.map(r => {
+            r._id = makeId(r);
+            r.linkedin_search = `https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(r.name + ' San Francisco')}`;
+            r.linkedin_people = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(r.name + ' San Francisco')}`;
+            const st = getLeadState(r._id);
+            r.status = st.status;
+            r.notes = st.notes;
+            r.dinner_rsvp = st.dinner_rsvp;
+            return r;
+        });
+        sfData = s;
+        allData = a;
+        renderLeads();
+        updateHeader();
     }
 
-    function getCurrentData() {
-        return data[currentTab] || [];
-    }
-
-    function filterData(rows) {
+    // --- Filtering ---
+    function getFilteredLeads() {
         const search = document.getElementById('searchInput').value.toLowerCase();
+        const statusF = document.getElementById('statusFilter').value;
         const typeF = document.getElementById('typeFilter').value;
         const emailF = document.getElementById('emailFilter').value;
-
-        return rows.filter(r => {
-            if (search) {
-                const hay = `${r.name} ${r.email || ''} ${r.phone || ''} ${r.address || ''} ${r.type || ''}`.toLowerCase();
-                if (!hay.includes(search)) return false;
-            }
+        return leads.filter(r => {
+            if (search && !`${r.name} ${r.email||''} ${r.phone||''} ${r.address||''} ${r.type||''}`.toLowerCase().includes(search)) return false;
+            if (statusF && r.status !== statusF) return false;
             if (typeF && r.type !== typeF) return false;
             if (emailF === 'yes' && !r.email) return false;
             if (emailF === 'no' && r.email) return false;
@@ -122,234 +230,308 @@
         });
     }
 
-    function debounceRender() {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(renderTable, 200);
-    }
+    function debounceRender() { clearTimeout(debounceTimer); debounceTimer = setTimeout(renderLeads, 200); }
 
-    function renderTable() {
-        if (currentTab === 'stats') { renderStats(); return; }
+    // --- Leads Table ---
+    function renderLeads() {
+        const rows = getFilteredLeads();
+        const tbody = document.getElementById('leadsTable');
+        document.getElementById('leadCount').textContent = `${rows.length} leads`;
 
-        const raw = getCurrentData();
-        const rows = filterData(raw);
-        document.getElementById('resultCount').textContent = `${rows.length} of ${raw.length}`;
-
-        const isTargets = currentTab === 'targets';
-        const isAll = currentTab === 'all';
-
-        let html = `<table class="w-full text-sm">
-        <thead><tr class="border-b border-white/5 text-left text-gray-400 text-xs uppercase tracking-wider">
-            <th class="px-4 py-3">Name</th>
-            ${isTargets ? '<th class="px-4 py-3">Type</th>' : ''}
-            ${isAll ? '<th class="px-4 py-3">City</th>' : ''}
-            <th class="px-4 py-3">Phone</th>
-            <th class="px-4 py-3">Email</th>
-            <th class="px-4 py-3">Links</th>
-        </tr></thead><tbody>`;
-
-        if (rows.length === 0) {
-            html += `<tr><td colspan="6" class="px-4 py-12 text-center text-gray-500">No results</td></tr>`;
-        } else {
-            rows.forEach((r, i) => {
-                const linkedinUrl = r.linkedin_search || `https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(r.name + ' San Francisco')}`;
-                html += `
-                <tr class="lead-row border-b border-white/5 cursor-pointer" onclick="openDetail(${i})">
-                    <td class="px-4 py-3">
-                        <div class="font-medium text-white">${esc(r.name)}</div>
-                        <div class="text-xs text-gray-500 mt-0.5">${esc(r.address || '')}</div>
-                    </td>
-                    ${isTargets ? `<td class="px-4 py-3"><span class="badge type-${r.type || ''}">${TYPE_LABELS[r.type] || r.type || ''}</span></td>` : ''}
-                    ${isAll ? `<td class="px-4 py-3 text-xs text-gray-400">${esc(r.city || '')}</td>` : ''}
-                    <td class="px-4 py-3 text-xs">${r.phone ? `<a href="tel:${r.phone}" class="text-blue-400 hover:underline" onclick="event.stopPropagation()">${esc(r.phone)}</a>` : '<span class="text-gray-600">--</span>'}</td>
-                    <td class="px-4 py-3 text-xs">${r.email ? `<a href="mailto:${r.email}" class="text-blue-400 hover:underline" onclick="event.stopPropagation()">${esc(r.email)}</a>` : '<span class="text-gray-600">--</span>'}</td>
-                    <td class="px-4 py-3" onclick="event.stopPropagation()">
-                        <div class="flex flex-col gap-1">
-                            ${r.website ? `<a href="${r.website}" target="_blank" class="bg-emerald-700 hover:bg-emerald-800 px-2 py-1 rounded text-xs text-white text-center">Website</a>` : ''}
-                            <a href="${linkedinUrl}" target="_blank" class="btn-linkedin px-2 py-1 rounded text-xs text-white text-center">LinkedIn</a>
-                        </div>
-                    </td>
-                </tr>`;
-            });
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="7" class="px-4 py-12 text-center text-gray-500">No leads found</td></tr>';
+            updateBulk(); return;
         }
 
-        html += '</tbody></table>';
-        document.getElementById('tableContainer').innerHTML = html;
-        document.getElementById('tableContainer').classList.remove('hidden');
-        document.getElementById('statsView').classList.add('hidden');
+        tbody.innerHTML = rows.map(r => {
+            const sel = selectedIds.has(r._id);
+            return `
+            <tr class="lead-row border-b border-white/5 ${sel ? 'selected' : ''}">
+                <td class="px-4 py-3"><div class="checkmark ${sel?'checked':''}" onclick="toggleSelect('${r._id}')">${sel?'<svg width="12" height="12" viewBox="0 0 12 12"><path d="M10 3L4.5 8.5L2 6" stroke="white" stroke-width="2" fill="none"/></svg>':''}</div></td>
+                <td class="px-4 py-3 cursor-pointer" onclick="openDetail('${r._id}')">
+                    <div class="font-medium text-white hover:text-indigo-400">${esc(r.name)}</div>
+                    <div class="text-xs text-gray-500 mt-0.5">${esc(r.address||'')}</div>
+                </td>
+                <td class="px-4 py-3"><span class="badge type-${r.type||''}">${TYPE_LABELS[r.type]||r.type||''}</span></td>
+                <td class="px-4 py-3"><div class="space-y-1">
+                    ${r.phone?`<div class="text-xs"><a href="tel:${r.phone}" class="text-blue-400 hover:underline">${esc(r.phone)}</a></div>`:''}
+                    ${r.email?`<div class="text-xs"><a href="mailto:${r.email}" class="text-blue-400 hover:underline">${esc(r.email)}</a></div>`:''}
+                </div></td>
+                <td class="px-4 py-3">
+                    <select onchange="quickStatus('${r._id}',this.value)" class="badge ${STATUS_COLORS[r.status]} border-0 cursor-pointer text-xs">
+                        ${STATUSES.map(s=>`<option value="${s}" ${s===r.status?'selected':''} class="bg-gray-900 text-white">${STATUS_LABELS[s]}</option>`).join('')}
+                    </select>
+                </td>
+                <td class="px-4 py-3"><div class="flex flex-col gap-1">
+                    ${r.website?`<a href="${r.website}" target="_blank" class="bg-emerald-700 hover:bg-emerald-800 px-2 py-1 rounded text-xs text-white text-center">Website</a>`:''}
+                    <a href="${r.linkedin_search}" target="_blank" class="btn-linkedin px-2 py-1 rounded text-xs text-white text-center">LinkedIn</a>
+                </div></td>
+                <td class="px-4 py-3"><button onclick="openDetail('${r._id}')" class="text-gray-400 hover:text-white text-xs">Details</button></td>
+            </tr>`;
+        }).join('');
+        updateBulk();
     }
 
-    function openDetail(idx) {
-        const rows = filterData(getCurrentData());
-        const r = rows[idx];
-        if (!r) return;
+    function toggleSelect(id) { selectedIds.has(id) ? selectedIds.delete(id) : selectedIds.add(id); renderLeads(); }
+    function toggleSelectAll() {
+        const rows = getFilteredLeads();
+        if (selectedIds.size === rows.length) selectedIds.clear();
+        else rows.forEach(r => selectedIds.add(r._id));
+        renderLeads();
+    }
+    function updateBulk() {
+        const el = document.getElementById('bulkActions');
+        if (selectedIds.size > 0) { el.classList.remove('hidden'); el.classList.add('flex'); document.getElementById('selectedCount').textContent = `${selectedIds.size} selected`; }
+        else { el.classList.add('hidden'); }
+    }
+    function bulkUpdate() {
+        const status = document.getElementById('bulkStatus').value;
+        if (!status) return;
+        selectedIds.forEach(id => {
+            setLeadState(id, { status });
+            const lead = leads.find(l => l._id === id);
+            if (lead) { lead.status = status; addLog(lead.name, status, `Bulk set to ${STATUS_LABELS[status]}`); }
+        });
+        document.getElementById('bulkStatus').value = '';
+        selectedIds.clear();
+        renderLeads();
+        updateHeader();
+    }
 
-        const linkedinUrl = r.linkedin_search || `https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(r.name + ' San Francisco')}`;
-        const linkedinPeople = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(r.name + ' San Francisco')}`;
+    function quickStatus(id, status) {
+        setLeadState(id, { status });
+        const lead = leads.find(l => l._id === id);
+        if (lead) { lead.status = status; addLog(lead.name, status, `Status changed to ${STATUS_LABELS[status]}`); }
+        updateHeader();
+    }
+
+    // --- Detail Modal ---
+    function openDetail(id) {
+        const lead = leads.find(l => l._id === id);
+        if (!lead) return;
+        const st = getLeadState(id);
+        const log = getLog().filter(l => l.name === lead.name).slice(0, 15);
 
         document.getElementById('modalContent').innerHTML = `
         <div class="p-6">
             <div class="flex items-start justify-between mb-6">
                 <div>
-                    <h2 class="text-xl font-bold text-white">${esc(r.name)}</h2>
-                    ${r.type ? `<span class="badge type-${r.type} mt-1 inline-block">${TYPE_LABELS[r.type] || r.type}</span>` : ''}
-                    ${r.city ? `<span class="text-xs text-gray-500 ml-2">${esc(r.city)}</span>` : ''}
+                    <h2 class="text-xl font-bold text-white">${esc(lead.name)}</h2>
+                    <span class="badge type-${lead.type} mt-1 inline-block">${TYPE_LABELS[lead.type]||lead.type}</span>
                 </div>
                 <button onclick="closeModal()" class="text-gray-400 hover:text-white text-2xl">&times;</button>
             </div>
             <div class="grid grid-cols-2 gap-4 mb-6">
-                <div class="glass rounded-lg p-3">
-                    <div class="text-xs text-gray-400 mb-1">Phone</div>
-                    <div>${r.phone ? `<a href="tel:${r.phone}" class="text-blue-400">${esc(r.phone)}</a>` : '--'}</div>
-                </div>
-                <div class="glass rounded-lg p-3">
-                    <div class="text-xs text-gray-400 mb-1">Email</div>
-                    <div>${r.email ? `<a href="mailto:${r.email}" class="text-blue-400">${esc(r.email)}</a>` : '--'}</div>
-                </div>
-                <div class="glass rounded-lg p-3">
-                    <div class="text-xs text-gray-400 mb-1">Website</div>
-                    <div>${r.website ? `<a href="${r.website}" target="_blank" class="text-blue-400 break-all text-sm">${esc(r.website)}</a>` : '--'}</div>
-                </div>
-                <div class="glass rounded-lg p-3">
-                    <div class="text-xs text-gray-400 mb-1">Address</div>
-                    <div class="text-sm">${esc(r.address || '--')}</div>
+                <div class="glass rounded-lg p-3"><div class="text-xs text-gray-400 mb-1">Phone</div><div>${lead.phone?`<a href="tel:${lead.phone}" class="text-blue-400">${esc(lead.phone)}</a>`:'--'}</div></div>
+                <div class="glass rounded-lg p-3"><div class="text-xs text-gray-400 mb-1">Email</div><div>${lead.email?`<a href="mailto:${lead.email}" class="text-blue-400">${esc(lead.email)}</a>`:'--'}</div></div>
+                <div class="glass rounded-lg p-3"><div class="text-xs text-gray-400 mb-1">Website</div><div>${lead.website?`<a href="${lead.website}" target="_blank" class="text-blue-400 break-all text-sm">${esc(lead.website)}</a>`:'--'}</div></div>
+                <div class="glass rounded-lg p-3"><div class="text-xs text-gray-400 mb-1">Address</div><div class="text-sm">${esc(lead.address||'--')}</div></div>
+            </div>
+            <div class="flex gap-3 mb-6">
+                ${lead.website?`<a href="${lead.website}" target="_blank" class="bg-emerald-700 hover:bg-emerald-800 px-4 py-2 rounded-lg text-sm text-white flex-1 text-center">Website</a>`:''}
+                <a href="${lead.linkedin_search}" target="_blank" class="btn-linkedin px-4 py-2 rounded-lg text-sm text-white flex-1 text-center">Search LinkedIn</a>
+                <a href="${lead.linkedin_people}" target="_blank" class="bg-blue-800 hover:bg-blue-900 px-4 py-2 rounded-lg text-sm text-white flex-1 text-center">Find People</a>
+            </div>
+            <div class="mb-6">
+                <div class="text-xs text-gray-400 mb-2">Status</div>
+                <div class="flex gap-2 flex-wrap">
+                    ${STATUSES.map(s=>`<button onclick="setDetailStatus('${id}','${s}')" class="px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${lead.status===s? STATUS_COLORS[s]+' ring-2 ring-white/20':'bg-white/5 text-gray-400 hover:bg-white/10'}">${STATUS_LABELS[s]}</button>`).join('')}
                 </div>
             </div>
-            ${r.rating ? `<div class="glass rounded-lg p-3 mb-6"><div class="text-xs text-gray-400 mb-1">Rating</div><div>${esc(r.rating)}</div></div>` : ''}
-            ${r.categories ? `<div class="glass rounded-lg p-3 mb-6"><div class="text-xs text-gray-400 mb-1">Categories</div><div class="text-sm">${esc(r.categories)}</div></div>` : ''}
-            <div class="flex gap-3">
-                ${r.website ? `<a href="${r.website}" target="_blank" class="bg-emerald-700 hover:bg-emerald-800 px-4 py-2 rounded-lg text-sm text-white flex-1 text-center">Visit Website</a>` : ''}
-                <a href="${linkedinUrl}" target="_blank" class="btn-linkedin px-4 py-2 rounded-lg text-sm text-white flex-1 text-center">Search LinkedIn</a>
-                <a href="${linkedinPeople}" target="_blank" class="bg-blue-800 hover:bg-blue-900 px-4 py-2 rounded-lg text-sm text-white flex-1 text-center">Find People</a>
+            <div class="mb-6">
+                <div class="text-xs text-gray-400 mb-2">Dinner RSVP</div>
+                <select onchange="setRsvp('${id}',this.value)" class="px-3 py-2 rounded-lg text-sm w-full">
+                    <option value="" ${!st.dinner_rsvp?'selected':''}>Not Yet Invited</option>
+                    <option value="pending" ${st.dinner_rsvp==='pending'?'selected':''}>Pending Response</option>
+                    <option value="yes" ${st.dinner_rsvp==='yes'?'selected':''}>Attending</option>
+                    <option value="no" ${st.dinner_rsvp==='no'?'selected':''}>Not Attending</option>
+                    <option value="maybe" ${st.dinner_rsvp==='maybe'?'selected':''}>Maybe</option>
+                </select>
+            </div>
+            <div class="mb-6">
+                <div class="text-xs text-gray-400 mb-2">Notes</div>
+                <textarea id="notesField" rows="3" class="w-full px-3 py-2 rounded-lg text-sm" placeholder="Add notes...">${esc(st.notes||'')}</textarea>
+                <button onclick="saveNotes('${id}')" class="mt-2 px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-sm text-white">Save Notes</button>
+            </div>
+            <div>
+                <div class="text-xs text-gray-400 mb-2">Activity Log</div>
+                <div class="space-y-2 max-h-40 overflow-y-auto">
+                    ${log.length ? log.map(l=>`<div class="flex items-center gap-3 text-xs text-gray-400"><span class="text-gray-600">${new Date(l.ts).toLocaleDateString()}</span><span>${esc(l.details||l.action)}</span></div>`).join('') : '<div class="text-xs text-gray-600">No activity yet</div>'}
+                </div>
             </div>
         </div>`;
         document.getElementById('modal').classList.remove('hidden');
         document.getElementById('modal').classList.add('flex');
     }
 
-    function closeModal() {
-        document.getElementById('modal').classList.add('hidden');
-        document.getElementById('modal').classList.remove('flex');
+    function closeModal() { document.getElementById('modal').classList.add('hidden'); document.getElementById('modal').classList.remove('flex'); }
+    document.addEventListener('keydown', e => { if (e.key==='Escape') closeModal(); });
+
+    function setDetailStatus(id, status) {
+        setLeadState(id, { status });
+        const lead = leads.find(l => l._id === id);
+        if (lead) { lead.status = status; addLog(lead.name, status, `Status changed to ${STATUS_LABELS[status]}`); }
+        renderLeads(); updateHeader(); openDetail(id);
     }
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
-
-    function switchTab(tab) {
-        currentTab = tab;
-        ['targets', 'sf', 'all', 'stats'].forEach(t => {
-            const el = document.getElementById(`tab-${t}`);
-            if (el) el.className = t === tab ? 'pb-3 text-sm font-medium tab-active' : 'pb-3 text-sm font-medium tab-inactive';
-        });
-
-        // Show/hide type filter (only for targets)
-        document.getElementById('typeFilter').style.display = tab === 'targets' ? '' : 'none';
-
-        if (tab === 'stats') {
-            renderStats();
-        } else {
-            renderTable();
-        }
+    function setRsvp(id, val) {
+        setLeadState(id, { dinner_rsvp: val });
+        const lead = leads.find(l => l._id === id);
+        if (lead) { lead.dinner_rsvp = val; addLog(lead.name, 'rsvp', `Dinner RSVP: ${val||'cleared'}`); }
+    }
+    function saveNotes(id) {
+        const notes = document.getElementById('notesField').value;
+        setLeadState(id, { notes });
+        const lead = leads.find(l => l._id === id);
+        if (lead) { lead.notes = notes; addLog(lead.name, 'notes', 'Notes updated'); }
     }
 
-    function renderStats() {
-        document.getElementById('tableContainer').classList.add('hidden');
-        const sv = document.getElementById('statsView');
-        sv.classList.remove('hidden');
+    // --- Header Stats ---
+    function updateHeader() {
+        const counts = {};
+        STATUSES.forEach(s => counts[s] = 0);
+        leads.forEach(l => counts[l.status] = (counts[l.status]||0) + 1);
+        document.getElementById('headerStats').innerHTML = `
+            <span>${leads.length} total</span>
+            <span class="text-yellow-400">${counts.contacted} contacted</span>
+            <span class="text-purple-400">${counts.invited} invited</span>
+            <span class="text-green-400">${counts.confirmed} confirmed</span>`;
+    }
 
-        const sf = data.sf;
-        const targets = data.targets;
-        const all = data.all;
+    // --- Dashboard ---
+    function renderDashboard() {
+        const counts = {};
+        STATUSES.forEach(s => counts[s] = 0);
+        leads.forEach(l => counts[l.status] = (counts[l.status]||0) + 1);
+        const pct = n => leads.length ? Math.round(n/leads.length*100) : 0;
 
-        const withEmail = sf.filter(r => r.email).length;
-        const withWebsite = sf.filter(r => r.website).length;
-        const withPhone = sf.filter(r => r.phone).length;
-        const indep = targets.filter(r => r.type === 'independent').length;
-        const large = targets.filter(r => r.type === 'large_brokerage').length;
-        const captive = targets.filter(r => r.type === 'captive_agent').length;
+        const typeCounts = {};
+        leads.forEach(l => typeCounts[l.type] = (typeCounts[l.type]||0)+1);
+        const withEmail = leads.filter(l=>l.email).length;
+        const withWebsite = leads.filter(l=>l.website).length;
+        const withPhone = leads.filter(l=>l.phone).length;
 
-        // City distribution from all data
-        const cities = {};
-        all.forEach(r => { const c = r.city || 'Unknown'; cities[c] = (cities[c] || 0) + 1; });
-        const topCities = Object.entries(cities).sort((a,b) => b[1] - a[1]).slice(0, 15);
+        const log = getLog().slice(0, 20);
 
-        sv.innerHTML = `
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div class="glass rounded-xl p-5 stat-card">
-                <div class="text-3xl font-bold text-white">${all.length.toLocaleString()}</div>
-                <div class="text-sm text-gray-400 mt-1">Total Bay Area Companies</div>
-            </div>
-            <div class="glass rounded-xl p-5 stat-card">
-                <div class="text-3xl font-bold text-indigo-400">${sf.length}</div>
-                <div class="text-sm text-gray-400 mt-1">SF Enriched</div>
-            </div>
-            <div class="glass rounded-xl p-5 stat-card">
-                <div class="text-3xl font-bold text-green-400">${targets.length}</div>
-                <div class="text-sm text-gray-400 mt-1">Broker Targets</div>
-            </div>
-            <div class="glass rounded-xl p-5 stat-card">
-                <div class="text-3xl font-bold text-yellow-400">${withEmail}</div>
-                <div class="text-sm text-gray-400 mt-1">SF With Email</div>
-            </div>
+        const rsvpCounts = { pending:0, yes:0, no:0, maybe:0 };
+        leads.forEach(l => { const r = getLeadState(l._id).dinner_rsvp; if(r) rsvpCounts[r]=(rsvpCounts[r]||0)+1; });
+
+        document.getElementById('view-dashboard').innerHTML = `
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+            <div class="glass rounded-xl p-5 stat-card"><div class="text-3xl font-bold text-white">${leads.length}</div><div class="text-sm text-gray-400 mt-1">Total Leads</div></div>
+            <div class="glass rounded-xl p-5 stat-card"><div class="text-3xl font-bold text-yellow-400">${counts.contacted}</div><div class="text-sm text-gray-400 mt-1">Contacted</div></div>
+            <div class="glass rounded-xl p-5 stat-card"><div class="text-3xl font-bold text-purple-400">${counts.invited}</div><div class="text-sm text-gray-400 mt-1">Invited</div></div>
+            <div class="glass rounded-xl p-5 stat-card"><div class="text-3xl font-bold text-green-400">${counts.confirmed}</div><div class="text-sm text-gray-400 mt-1">Confirmed</div></div>
+            <div class="glass rounded-xl p-5 stat-card"><div class="text-3xl font-bold text-red-400">${counts.declined}</div><div class="text-sm text-gray-400 mt-1">Declined</div></div>
         </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div class="glass rounded-xl p-5">
-                <h3 class="text-sm font-medium text-white mb-4">SF Enrichment Coverage</h3>
+                <h3 class="text-sm font-medium text-white mb-4">Status Breakdown</h3>
                 <div class="space-y-3">
-                    <div class="flex items-center gap-3">
-                        <span class="text-sm text-gray-400 w-24">Phone</span>
-                        <div class="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><div class="h-full bg-blue-500 rounded-full" style="width: ${Math.round(withPhone/sf.length*100)}%"></div></div>
-                        <span class="text-sm text-gray-400 w-16 text-right">${withPhone} (${Math.round(withPhone/sf.length*100)}%)</span>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <span class="text-sm text-gray-400 w-24">Website</span>
-                        <div class="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><div class="h-full bg-emerald-500 rounded-full" style="width: ${Math.round(withWebsite/sf.length*100)}%"></div></div>
-                        <span class="text-sm text-gray-400 w-16 text-right">${withWebsite} (${Math.round(withWebsite/sf.length*100)}%)</span>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <span class="text-sm text-gray-400 w-24">Email</span>
-                        <div class="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><div class="h-full bg-yellow-500 rounded-full" style="width: ${Math.round(withEmail/sf.length*100)}%"></div></div>
-                        <span class="text-sm text-gray-400 w-16 text-right">${withEmail} (${Math.round(withEmail/sf.length*100)}%)</span>
-                    </div>
+                    ${STATUSES.map(s=>`<div class="flex items-center gap-3"><span class="badge ${STATUS_COLORS[s]} w-28 text-center">${STATUS_LABELS[s]}</span><div class="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><div class="h-full rounded-full" style="width:${pct(counts[s])}%;background:${s==='new'?'#60a5fa':s==='contacted'?'#fbbf24':s==='invited'?'#a78bfa':s==='confirmed'?'#34d399':s==='declined'?'#f87171':'#9ca3af'}"></div></div><span class="text-sm text-gray-400 w-8 text-right">${counts[s]}</span></div>`).join('')}
                 </div>
             </div>
             <div class="glass rounded-xl p-5">
-                <h3 class="text-sm font-medium text-white mb-4">Broker Target Types</h3>
+                <h3 class="text-sm font-medium text-white mb-4">Lead Types</h3>
                 <div class="space-y-3">
-                    <div class="flex items-center gap-3">
-                        <span class="badge type-independent w-32 text-center">Independent</span>
-                        <div class="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><div class="h-full bg-green-500 rounded-full" style="width: ${Math.round(indep/targets.length*100)}%"></div></div>
-                        <span class="text-sm text-gray-400 w-8 text-right">${indep}</span>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <span class="badge type-large_brokerage w-32 text-center">Large Brokerage</span>
-                        <div class="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><div class="h-full bg-blue-500 rounded-full" style="width: ${Math.round(large/targets.length*100)}%"></div></div>
-                        <span class="text-sm text-gray-400 w-8 text-right">${large}</span>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <span class="badge type-captive_agent w-32 text-center">Captive Agent</span>
-                        <div class="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><div class="h-full bg-gray-500 rounded-full" style="width: ${Math.round(captive/targets.length*100)}%"></div></div>
-                        <span class="text-sm text-gray-400 w-8 text-right">${captive}</span>
-                    </div>
+                    ${Object.entries(typeCounts).map(([k,v])=>`<div class="flex items-center gap-3"><span class="badge type-${k} w-32 text-center">${TYPE_LABELS[k]||k}</span><div class="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><div class="h-full bg-indigo-500 rounded-full" style="width:${pct(v)}%"></div></div><span class="text-sm text-gray-400 w-8 text-right">${v}</span></div>`).join('')}
+                </div>
+                <div class="mt-6 pt-4 border-t border-white/5 space-y-2">
+                    <div class="flex justify-between text-sm"><span class="text-gray-400">With Email</span><span class="text-white">${withEmail}</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-gray-400">With Website</span><span class="text-white">${withWebsite}</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-gray-400">With Phone</span><span class="text-white">${withPhone}</span></div>
+                </div>
+            </div>
+            <div class="glass rounded-xl p-5">
+                <h3 class="text-sm font-medium text-white mb-4">Dinner RSVPs</h3>
+                <div class="space-y-3">
+                    <div class="flex justify-between text-sm"><span class="text-green-400">Attending</span><span class="text-white text-2xl font-bold">${rsvpCounts.yes}</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-yellow-400">Pending</span><span class="text-white text-lg">${rsvpCounts.pending}</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-blue-400">Maybe</span><span class="text-white text-lg">${rsvpCounts.maybe}</span></div>
+                    <div class="flex justify-between text-sm"><span class="text-red-400">Not Attending</span><span class="text-white text-lg">${rsvpCounts.no}</span></div>
+                    <div class="mt-4 pt-4 border-t border-white/5 flex justify-between text-sm"><span class="text-gray-400">Not yet invited</span><span class="text-white">${leads.length - rsvpCounts.yes - rsvpCounts.pending - rsvpCounts.maybe - rsvpCounts.no}</span></div>
                 </div>
             </div>
         </div>
         <div class="glass rounded-xl p-5">
-            <h3 class="text-sm font-medium text-white mb-4">Top Cities (All Bay Area)</h3>
+            <h3 class="text-sm font-medium text-white mb-4">Recent Activity</h3>
             <div class="space-y-2">
-                ${topCities.map(([city, count]) => `
-                <div class="flex items-center gap-3">
-                    <span class="text-sm text-gray-400 w-36">${esc(city)}</span>
-                    <div class="flex-1 h-2 bg-white/5 rounded-full overflow-hidden"><div class="h-full bg-indigo-500 rounded-full" style="width: ${Math.round(count/all.length*100*5)}%"></div></div>
-                    <span class="text-sm text-gray-400 w-12 text-right">${count}</span>
-                </div>`).join('')}
+                ${log.length ? log.map(l=>`<div class="flex items-center gap-3 text-sm py-1 border-b border-white/5"><span class="text-gray-600 text-xs w-24">${new Date(l.ts).toLocaleDateString()}</span><span class="text-white font-medium">${esc(l.name)}</span><span class="text-gray-400">${esc(l.details||l.action)}</span></div>`).join('') : '<div class="text-gray-600 text-sm">No activity yet. Start updating lead statuses!</div>'}
             </div>
         </div>`;
     }
 
-    function esc(s) {
-        if (!s) return '';
-        const d = document.createElement('div');
-        d.textContent = s;
-        return d.innerHTML;
+    // --- Pipeline ---
+    function renderPipeline() {
+        const stages = ['new','contacted','invited','confirmed','declined'];
+        const grouped = {};
+        stages.forEach(s => grouped[s] = []);
+        leads.forEach(l => { const s = stages.includes(l.status)?l.status:'new'; grouped[s].push(l); });
+
+        document.getElementById('view-pipeline').innerHTML = `<div class="grid grid-cols-5 gap-4">${stages.map(stage=>`
+        <div class="glass rounded-xl p-3 pipeline-col">
+            <div class="flex items-center gap-2 mb-3 px-1">
+                <span class="badge ${STATUS_COLORS[stage]}">${STATUS_LABELS[stage]}</span>
+                <span class="text-xs text-gray-500">${grouped[stage].length}</span>
+            </div>
+            <div class="space-y-2 max-h-[65vh] overflow-y-auto">
+                ${grouped[stage].map(l=>`
+                <div class="glass rounded-lg p-3 cursor-pointer hover:bg-white/5" onclick="openDetail('${l._id}')">
+                    <div class="text-sm font-medium text-white truncate">${esc(l.name)}</div>
+                    <div class="text-xs text-gray-500 mt-1 truncate">${esc(l.phone||l.email||'')}</div>
+                    <div class="flex gap-1 mt-2">
+                        <span class="badge type-${l.type}">${TYPE_LABELS[l.type]||l.type}</span>
+                        ${l.dinner_rsvp?`<span class="badge ${l.dinner_rsvp==='yes'?'status-confirmed':l.dinner_rsvp==='pending'?'status-contacted':'status-declined'}">${l.dinner_rsvp}</span>`:''}
+                    </div>
+                </div>`).join('')}
+            </div>
+        </div>`).join('')}</div>`;
     }
+
+    // --- SF / All tables ---
+    function renderBrowseTable(rows, containerId) {
+        const search = document.getElementById('searchInput').value.toLowerCase();
+        let filtered = rows;
+        if (search) filtered = rows.filter(r => `${r.name} ${r.email||''} ${r.phone||''} ${r.city||''} ${r.address||''}`.toLowerCase().includes(search));
+
+        let html = `<table class="w-full text-sm"><thead><tr class="border-b border-white/5 text-left text-gray-400 text-xs uppercase tracking-wider">
+            <th class="px-4 py-3">Name</th><th class="px-4 py-3">City</th><th class="px-4 py-3">Phone</th><th class="px-4 py-3">Email</th><th class="px-4 py-3">Links</th>
+        </tr></thead><tbody>`;
+        const show = filtered.slice(0, 500);
+        show.forEach(r => {
+            const li = `https://www.linkedin.com/search/results/all/?keywords=${encodeURIComponent(r.name+' '+(r.city||'San Francisco'))}`;
+            html += `<tr class="lead-row border-b border-white/5">
+                <td class="px-4 py-3"><div class="font-medium text-white">${esc(r.name)}</div><div class="text-xs text-gray-500">${esc(r.address||'')}</div></td>
+                <td class="px-4 py-3 text-xs text-gray-400">${esc(r.city||'')}</td>
+                <td class="px-4 py-3 text-xs">${r.phone?`<a href="tel:${r.phone}" class="text-blue-400">${esc(r.phone)}</a>`:'--'}</td>
+                <td class="px-4 py-3 text-xs">${r.email?`<a href="mailto:${r.email}" class="text-blue-400">${esc(r.email)}</a>`:'--'}</td>
+                <td class="px-4 py-3"><div class="flex flex-col gap-1">
+                    ${r.website?`<a href="${r.website}" target="_blank" class="bg-emerald-700 hover:bg-emerald-800 px-2 py-1 rounded text-xs text-white text-center">Website</a>`:''}
+                    <a href="${li}" target="_blank" class="btn-linkedin px-2 py-1 rounded text-xs text-white text-center">LinkedIn</a>
+                </div></td>
+            </tr>`;
+        });
+        if (filtered.length > 500) html += `<tr><td colspan="5" class="px-4 py-3 text-center text-gray-500 text-xs">Showing 500 of ${filtered.length} — use search to narrow</td></tr>`;
+        html += '</tbody></table>';
+        document.getElementById(containerId).innerHTML = html;
+    }
+
+    // --- Tab switching ---
+    function switchTab(tab) {
+        currentTab = tab;
+        ['leads','dashboard','pipeline','sf','all'].forEach(t => {
+            const el = document.getElementById(`view-${t}`);
+            const tabEl = document.getElementById(`tab-${t}`);
+            if (el) el.classList.toggle('hidden', t !== tab);
+            if (tabEl) tabEl.className = t === tab ? 'pb-3 text-sm font-medium tab-active' : 'pb-3 text-sm font-medium tab-inactive';
+        });
+        if (tab === 'dashboard') renderDashboard();
+        else if (tab === 'pipeline') renderPipeline();
+        else if (tab === 'sf') renderBrowseTable(sfData, 'sfTable');
+        else if (tab === 'all') renderBrowseTable(allData, 'allTable');
+        else renderLeads();
+    }
+
+    function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
     loadData();
     </script>
